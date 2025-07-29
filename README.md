@@ -12,15 +12,16 @@
 
 #### 如何使用
 
-1. 安裝並打開應用程式  
-2. 點右上角的頭像圖示，輸入你的 User ID  
-3. 選擇你想執行的功能（如取得寶石）  
-4. 輸入數量並送出請求  
-5. 等待處理完成，即可獲得資源！
+1. 下載[安裝包](https://github.com/SweetPotatoYee/Duolingo-Pro-for-Android/raw/refs/heads/main/build/release/app-release.apk)
+2. 安裝並打開應用程式  
+3. 點右上角的頭像圖示，輸入你的 User ID  
+4. 選擇你想執行的功能（如取得寶石）  
+5. 輸入數量並送出請求  
+6. 等待處理完成，即可獲得資源！
 
 #### 如何取得 User ID？
 
-1. 開啟 Duolingo 頁面（https://duolingo.com）  
+1. 開啟 [Duolingo](https://duolingo.com) 頁面
 2. 複製以下這段文字貼到網址列（但前面手動補上 `j`，變成 `javascript:`，Chrome 會自動清掉）：  
    
    ```
