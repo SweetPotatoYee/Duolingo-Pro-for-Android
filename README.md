@@ -28,7 +28,7 @@
    avascript:(function(){try{const token=document.cookie.split(';').find(c=>c.includes('jwt_token')).split('=')[1];const el=document.createElement('textarea');el.value=token;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);alert('已複製 User ID：'+token);}catch(e){alert('找不到登入資訊');}})();
    ```
 
-3. 按下 Enter，會自動複製 User ID 到剪貼簿  
+3. 按下 Enter (不是搜尋)，會自動複製 User ID 到剪貼簿  
 4. 回到 App，貼上即可
 
 #### 注意事項
