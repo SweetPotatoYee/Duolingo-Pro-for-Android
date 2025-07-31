@@ -12,7 +12,7 @@
 
 #### 如何使用
 
-1. 下載[安裝包](https://github.com/SweetPotatoYee/Duolingo-Pro-for-Android/raw/refs/heads/main/build/release/app-release.apk)
+1. ~~下載~~ 更新即將發布，暫停下載
 2. 安裝並打開應用程式  
 3. 點右上角的頭像圖示，輸入你的 User ID  
 4. 選擇你想執行的功 
