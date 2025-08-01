@@ -1,12 +1,32 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:easy_localization/easy_localization.dart';
 
-void main() => runApp(const DuolingoProApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await EasyLocalization.ensureInitialized();
+
+  runApp(
+    EasyLocalization(
+      supportedLocales: const [
+        Locale('en'),
+        Locale('zh', 'TW'),
+        Locale('zh', 'CN'),
+        Locale('es'),
+      ],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('en'),
+      child: const DuolingoProApp(),
+    ),
+  );
+}
 
 class DuolingoProApp extends StatelessWidget {
   const DuolingoProApp({super.key});
@@ -18,6 +38,9 @@ class DuolingoProApp extends StatelessWidget {
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
       darkTheme: ThemeData.dark(useMaterial3: true),
       themeMode: ThemeMode.system,
+      locale: context.locale,
+      supportedLocales: context.supportedLocales,
+      localizationsDelegates: context.localizationDelegates,
       home: const MainScreen(),
     );
   }
@@ -32,7 +55,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   String userId = '';
-  String pingStatus = '尚未連線';
+  String pingStatus = 'connect_no'.tr();
   Timer? pingTimer;
   final String apiUrl = 'https://api.duolingopro.net';
   bool isActive = true;
@@ -41,6 +64,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationLoader.checkAndShowNotices(context, mounted);
+    });
     _loadUserId();
   }
 
@@ -76,8 +102,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _ping() async {
     if (!isActive || userId.isEmpty) return;
-
-    setState(() => pingStatus = '連線中...');
+    if (pingStatus == 'connect_ed'.tr()) {}
+    setState(
+      () => pingStatus = pingStatus == 'connect_ed'.tr()
+          ? 'connect_ed'.tr()
+          : 'connect_ing'.tr(),
+    );
     setState(() => statusIcon = Icons.change_circle);
     final payload = jsonEncode({
       "version": "3.1 BETA.01",
@@ -93,16 +123,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       );
 
       if (res.statusCode == 200) {
-        setState(() => pingStatus = '已連線');
+        setState(() => pingStatus = 'connect_ed'.tr());
         setState(() => statusIcon = Icons.check_circle);
         _startPingLoop();
       } else {
-        setState(() => pingStatus = '錯誤 ${res.statusCode}');
+        setState(() => pingStatus = 'error'.tr() + res.statusCode.toString());
         setState(() => statusIcon = Icons.cancel);
         Future.delayed(const Duration(seconds: 3), _ping);
       }
     } catch (e) {
-      setState(() => pingStatus = '錯誤');
+      setState(() => pingStatus = 'error'.tr());
       setState(() => statusIcon = Icons.cancel);
       Future.delayed(const Duration(seconds: 3), _ping);
     }
@@ -125,16 +155,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     final result = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('輸入 User ID'),
+        title: Text('enter_user_id'.tr()),
         content: TextField(controller: controller),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text('cancel'.tr()),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('儲存'),
+            child: Text('save'.tr()),
           ),
         ],
       ),
@@ -142,110 +172,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (result != null && result.isNotEmpty) _saveUserId(result);
   }
 
-  void _showAbout() {
+  void _showAbout(BuildContext context) {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      builder: (BuildContext context) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/logo.svg',
-                  width: 48,
-                  colorFilter: ColorFilter.mode(
-                    Theme.of(context).colorScheme.primary,
-                    BlendMode.srcIn,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Duilingo Pro',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text('版本 1.6.2'),
-            const SizedBox(height: 8),
-            const Text('SweetPotatoYee'),
-          ],
-        ),
-      ),
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (context) => const AboutBottomSheet(),
     );
   }
 
   void _showNotificationDialog(Map<String, dynamic> notification) {
-    String translate(String text) {
-      final translations = {
-        "You": "你",
-        "redeemed": "兌換了",
-        "redeem": "兌換",
-        " can": "可以",
-        " send": "傳送",
-        "request": "請求",
-        "every": "每",
-        "Please wait before trying again": "請稍後再試",
-        "Successfully Received": "成功獲得",
-        "Successfully Redeemed": "成功兌換",
-        "Successful": "成功",
-        "Attempted to Give": "嘗試贈送",
-        "Limit Warning": "限制警告",
-        "Failed": "失敗",
-        "You received": "你獲得了",
-        "You can request up to": "你還可以請求",
-        "before your limit resets back to": "，限制將在重置回",
-        " in": "於",
-        "To boost your limits": "要提高限制",
-        "<a href='https://duolingopro.net/patreon' target='_blank' style='font-family: Duolingo Pro Rounded; text-decoration: underline; color: #007AFF;'>donate</a>":
-            "請贊助",
-        "again in": "在",
-        " a ": "1",
-        "however it may not have worked. Please refresh the page to confirm":
-            "但可能未成功，請刷新頁面確認",
-        "Streak Freezes": "連勝激凍",
-        "Streak Freeze": "連勝激凍",
-        "streak freezes": "連勝激凍",
-        "streak freeze": "連勝激凍",
-        "XP": "經驗值",
-        "XP-Boost": "經驗值加成",
-        "Heart Refill": "填滿紅心",
-        "heart refill": "填滿紅心",
-        "Streaks": "連勝",
-        "Streak": "連勝",
-        "streaks": "連勝",
-        "streak": "連勝",
-        "of": "的",
-        "Gems": "寶石",
-        "Gem": "寶石",
-        "gems": "寶石",
-        "gem": "寶石",
-        "minute": "分鐘",
-        "minutes": "分鐘",
-        "hour": "小時",
-        "hours": "小時",
-        "second": "秒",
-        "seconds": "秒",
-        "day": "天",
-        "days": "天",
-        "and": "",
-        ".": "。",
-        ",": "，",
-      };
+    final head = notification['head'] ?? 'notification';
+    final body = notification['body'] ?? '';
 
-      translations.entries.toList()
-        ..sort((a, b) => b.key.length.compareTo(a.key.length))
-        ..forEach((e) => text = text.replaceAll(e.key, e.value));
-
-      return text;
-    }
-
-    final head = translate(notification['head'] ?? '訊息');
-    final body = translate(notification['body'] ?? '');
     final icon = notification['icon'] ?? '';
 
     IconData materialIcon;
@@ -277,7 +217,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('關閉'),
+            child: Text('close'.tr()),
           ),
         ],
       ),
@@ -294,46 +234,43 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     final controller = TextEditingController();
     String? result;
 
-if (requireInput) {
-  result = await showDialog<String>(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Text(title),
-      content: TextField(
-        controller: controller,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly], // 限制只能輸入數字
-        decoration: InputDecoration(
-          hintText: '請輸入數字',
-          border: OutlineInputBorder(),
+    if (requireInput) {
+      result = await showDialog<String>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(border: OutlineInputBorder()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('cancel'.tr()),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: Text('submit'.tr()),
+            ),
+          ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context, controller.text),
-          child: const Text('送出'),
-        ),
-      ],
-    ),
-  );
-} else {
+      );
+    } else {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
           title: Text(title),
-          content: const Text('確認送出請求？'),
+          content: Text('confirm_r'.tr()),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
+              child: Text('cancel'.tr()),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('確認'),
+              child: Text('confirm'.tr()),
             ),
           ],
         ),
@@ -349,10 +286,10 @@ if (requireInput) {
         context: context,
         barrierDismissible: false,
         builder: (_) => AlertDialog(
-          title: const Text('處理中...'),
+          title: Text('processing'.tr()),
           content: ValueListenableBuilder<int>(
             valueListenable: percentage,
-            builder: (_, value, __) => Column(
+            builder: (_, value, _) => Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 LinearProgressIndicator(value: value / 100),
@@ -414,7 +351,10 @@ if (requireInput) {
           client.close();
         } catch (e) {
           if (mounted) Navigator.pop(context);
-          _showNotificationDialog({"head": "發送失敗", "body": e.toString()});
+          _showNotificationDialog({
+            "head": "failed_s".tr(),
+            "body": e.toString(),
+          });
           debugPrint('❌ Error during gem request: $e');
         }
       } else {
@@ -442,7 +382,10 @@ if (requireInput) {
           }
         } catch (e) {
           if (mounted) Navigator.pop(context);
-          _showNotificationDialog({"head": "發送失敗", "body": e.toString()});
+          _showNotificationDialog({
+            "head": "failed_s".tr(),
+            "body": e.toString(),
+          });
           debugPrint('❌ Error during request: $e');
         }
       }
@@ -467,7 +410,7 @@ if (requireInput) {
           ),
           IconButton(
             icon: const Icon(Icons.info_outline),
-            onPressed: _showAbout,
+            onPressed: () => _showAbout(context),
           ),
         ],
       ),
@@ -494,44 +437,45 @@ if (requireInput) {
                 mainAxisSpacing: 12,
                 children: [
                   ElevatedButton(
-                    onPressed: () => _showActionDialog('請求經驗值', 'xp'),
-                    child: const Text('取得 XP'),
+                    onPressed: () => _showActionDialog("xp_button".tr(), 'xp'),
+                    child: Text('request_xp'.tr()),
                   ),
                   ElevatedButton(
-                    onPressed: () => _showActionDialog('請求寶石', '', isGem: true),
-                    child: const Text('取得 Gems'),
+                    onPressed: () =>
+                        _showActionDialog('request_gems'.tr(), '', isGem: true),
+                    child: Text('gems_button'.tr()),
                   ),
                   ElevatedButton(
                     onPressed: () => _showActionDialog(
-                      '請求 Duolingo Super 3 天試用',
+                      'request_super'.tr(),
                       'super',
                       requireInput: false,
                     ),
-                    child: const Text('取得 Super'),
+                    child: Text('super_button'.tr()),
                   ),
                   ElevatedButton(
                     onPressed: () => _showActionDialog(
-                      '取得經驗值加成',
+                      'request_double_xp'.tr(),
                       'double_xp_boost',
                       requireInput: false,
                     ),
-                    child: const Text('取得經驗值加成'),
+                    child: Text('double_xp_button'.tr()),
                   ),
                   ElevatedButton(
                     onPressed: () => _showActionDialog(
-                      '取得連勝激凍',
+                      'request_streak_freeze'.tr(),
                       'streak_freeze',
                       requireInput: true,
                     ),
-                    child: const Text('取得連勝激凍'),
+                    child: Text('streak_freeze_button'.tr()),
                   ),
                   ElevatedButton(
                     onPressed: () => _showActionDialog(
-                      '請求重置紅心',
+                      'request_heart_refill'.tr(),
                       'heart_refill',
                       requireInput: false,
                     ),
-                    child: const Text('重置紅心'),
+                    child: Text('heart_refill_button'.tr()),
                   ),
                 ],
               ),
@@ -540,5 +484,213 @@ if (requireInput) {
         ),
       ),
     );
+  }
+}
+
+class AboutBottomSheet extends StatefulWidget {
+  const AboutBottomSheet({super.key});
+
+  @override
+  State<AboutBottomSheet> createState() => _AboutBottomSheetState();
+}
+
+class _AboutBottomSheetState extends State<AboutBottomSheet> {
+  String versionText = '';
+  bool hasUpdate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocalVersion();
+    _checkRemoteUpdate();
+  }
+
+  Future<void> _loadLocalVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+    setState(() {
+      versionText = '${info.version} (${info.buildNumber})';
+    });
+  }
+
+  Future<void> _checkRemoteUpdate() async {
+    final info = await PackageInfo.fromPlatform();
+    final localBuild = int.tryParse(info.buildNumber) ?? 0;
+
+    try {
+      final res = await http.get(
+        Uri.parse(
+          'https://raw.githubusercontent.com/SweetPotatoYee/Duolingo-Pro-for-Android/refs/heads/main/versionCode',
+        ),
+      );
+      final remoteBuild = int.tryParse(res.body.trim());
+      if (!mounted) return;
+      setState(() {
+        hasUpdate = remoteBuild != null && remoteBuild > localBuild;
+      });
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              SvgPicture.asset(
+                'assets/logo.svg',
+                width: 48,
+                height: 48,
+                colorFilter: ColorFilter.mode(
+                  Theme.of(context).colorScheme.primary,
+                  BlendMode.srcIn,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Duolingo Pro',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    Text(
+                      'Powered by DuolingoPro.net',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    Text(
+                      'Copyright © 2025 anonymoushackerIV',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${'version'.tr()} $versionText',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${'developer'.tr()}: SweetPotatoYee',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: Text('license'.tr()),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              showLicensePage(
+                context: context,
+                applicationName: 'Duolingo Pro',
+                applicationVersion: versionText,
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.system_update_alt_outlined),
+            title: Text('update_c'.tr()),
+            subtitle: Text(
+              hasUpdate ? 'update_1'.tr() : 'update_0'.tr(),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            trailing: hasUpdate
+                ? FilledButton.icon(
+                    icon: const Icon(Icons.download),
+                    label: Text('download'.tr()),
+                    onPressed: () async {
+                      final url = Uri.parse(
+                        'https://github.com/SweetPotatoYee/Duolingo-Pro-for-Android/raw/refs/heads/main/build/release/latest.apk',
+                      );
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(
+                          url,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }
+                    },
+                  )
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class NotificationLoader {
+  static const String remoteUrl =
+      'https://raw.githubusercontent.com/SweetPotatoYee/Duolingo-Pro-for-Android/main/config/notification.json';
+
+  static String getLangKey(Locale locale) {
+    final tag = locale.toLanguageTag();
+    if (tag.startsWith('zh-TW') || tag.startsWith('zh-Hant')) return 'zh-TW';
+    if (tag.startsWith('zh-CN') || tag.startsWith('zh-Hans')) return 'zh-CN';
+    if (tag.startsWith('es')) return 'es';
+    return 'en';
+  }
+
+  static Future<void> checkAndShowNotices(
+    BuildContext context,
+    bool mounted,
+  ) async {
+    if (!mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final seenIds = prefs.getStringList('seen_notices') ?? [];
+
+    final res = await http.get(Uri.parse(remoteUrl));
+    if (res.statusCode != 200) return;
+
+    final List data = jsonDecode(res.body);
+
+    final locale = Localizations.localeOf(context);
+    final langKey = getLangKey(locale);
+
+    for (final item in data) {
+      final String id = item['id'];
+      if (seenIds.contains(id)) continue;
+
+      final content = item['langs'][langKey] ?? item['langs']['en'];
+      final head = content['head'] ?? 'Notice';
+      final body = content['body'] ?? '';
+
+      if (!mounted) return;
+
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(head),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+
+      seenIds.add(id);
+      await prefs.setStringList('seen_notices', seenIds);
+    }
   }
 }
