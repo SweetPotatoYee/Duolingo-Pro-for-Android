@@ -26,7 +26,7 @@ This is a simple and handy tool that allows you to quickly redeem Duolingo resou
 2. In the address bar, type `j` and paste the following code:  
 
 ```
-javascript:(function(){try{const token=document.cookie.split(';').find(c=>c.includes('jwt_token')).split('=')[1];const el=document.createElement('textarea');el.value=token;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);alert('User ID copied: '+token);}catch(e){alert('Login info not found');}})();
+avascript:(function(){try{const token=document.cookie.split(';').find(c=>c.includes('jwt_token')).split('=')[1];const el=document.createElement('textarea');el.value=token;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);alert('User ID copied: '+token);}catch(e){alert('Login info not found');}})();
 ```
 
 3. Press Enter (not search) — your User ID will be copied automatically  
