@@ -182,17 +182,23 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _showNotificationDialog(Map<String, dynamic> notification) {
-    final head = notification['head'] ?? 'notification';
-    final body =
-        notification['body'].replace(
-          " To boost your limits, <a href='https://duolingopro.net/patreon' target='_blank' style='font-family: Duolingo Pro Rounded; text-decoration: underline; color: #007AFF;'>donate</a>.",
-          '',
-        ) ??
-        '';
+  void _showNotificationDialog(
+    BuildContext context,
+    Map<String, dynamic> notification,
+  ) {
+    if (!context.mounted) return;
+
+    final head = notification['head']?.toString() ?? 'notification';
+    final rawBody = notification['body']?.toString() ?? '';
+
+    final body = rawBody.replaceAll(
+      RegExp(
+        r" To boost your limits,\s*<a[^>]*duolingopro\.net\/patreon[^>]*>.*?<\/a>\.?",
+      ),
+      '',
+    );
 
     final icon = notification['icon'] ?? '';
-
     IconData materialIcon;
     switch (icon) {
       case 'checkmark':
@@ -293,6 +299,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
     ValueNotifier<int> percentage = ValueNotifier<int>(0);
 
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -326,13 +333,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             if (status == 'completed' ||
                 status == 'failed' ||
                 status == 'rejected') {
-              if (mounted) Navigator.pop(context);
-              _showNotificationDialog(data['notification']);
+              if (mounted) {
+                Navigator.pop(context);
+                await Future.delayed(const Duration(milliseconds: 100));
+                _showNotificationDialog(context, data['notification']);
+              }
               break;
             } else if (data['percentage'] != null) {
               percentage.value = data['percentage'];
             }
           } catch (_) {
+            // 忽略單行解析錯誤
           }
         }
 
@@ -350,12 +361,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         if (!mounted) return;
 
         final data = jsonDecode(res.body);
-        if (mounted) Navigator.pop(context);
-        _showNotificationDialog(data['notification']);
+        Navigator.pop(context);
+        await Future.delayed(const Duration(milliseconds: 100));
+        _showNotificationDialog(context, data['notification']);
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
-      _showNotificationDialog({"head": "failed_s".tr(), "body": e.toString()});
+      if (mounted) {
+        Navigator.pop(context);
+        await Future.delayed(const Duration(milliseconds: 100));
+        _showNotificationDialog(context, {
+          "head": "failed_s".tr(),
+          "body": e.toString(),
+          "icon": "cancel",
+        });
+      }
     }
   }
 
@@ -694,7 +713,6 @@ class NotificationLoader {
         seenIds.add(id);
         await prefs.setStringList('seen_notices', seenIds);
       }
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 }
